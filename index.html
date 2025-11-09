@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>xoleric yaratgan</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    (function () {
+      const { sin, cos, hypot, max, min, PI } = Math;
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+
+      let w = 0, h = 0;
+
+      function resize() {
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        const cssW = window.innerWidth;
+        const cssH = window.innerHeight;
+        canvas.style.width = cssW + 'px';
+        canvas.style.height = cssH + 'px';
+        canvas.width = Math.round(cssW * dpr);
+        canvas.height = Math.round(cssH * dpr);
+        ctx.setTransform(1,0,0,1,0,0);
+        w = canvas.width;
+        h = canvas.height;
+        ctx.translate(w/2, h/2);
+        ctx.scale(w, w);
+      }
+      resize();
+      addEventListener('resize', resize);
+
+      // helperlar
+      const rnd = (x, dx=0)=>Math.random()*x+dx;
+      const rnds = (x=1)=>rnd(x,-x/2);
+      const pt = (x,y)=>({x,y});
+      const lerp=(a,b,t)=>a+(b-a)*t;
+      const lerpPt=(a,b,t)=>pt(lerp(a.x,b.x,t),lerp(a.y,b.y,t));
+      const many=(n,f)=>Array.from({length:n},(_,i)=>f(i));
+      const smoothstep=t=>3*t*t-2*t*t;
+      const circle=(p,r)=>{ctx.beginPath();ctx.ellipse(p.x,p.y,r,r,0,0,PI*2);ctx.fill();};
+
+      function tentacle(from, to, t){
+        let count=100;
+        t=smoothstep(t);
+        many(count, i=>{
+          let x=i/count;
+          if(x>t)return;
+          let p=lerpPt(from,to,x);
+          x-=0.5;
+          let r=(x*x+0.2)**2*0.02;
+          circle(p,r);
+        });
+      }
+
+      function thing(){
+        let x=rnds(), y=rnds(),
+            kx=rnd(1,1), ky=rnd(1,1),
+            rx=rnd(0.1,0.02), ry=rnd(0.1,0.02),
+            targetX=rnds(0.5), targetY=rnds(0.5),
+            pts=many(222,()=>({
+              da:rnd()*PI*2,
+              n:rnd(3,3)|0,
+              x:rnds(),
+              y:rnds(),
+              t:0
+            }));
+        return {
+          follow(x_,y_){ targetX=x_; targetY=y_; },
+          tick(t){
+            x+=(targetX+cos(t/kx)*rx - x)/30;
+            y+=(targetY+sin(t/ky)*ry - y)/30;
+            let c=pt(x,y);
+            pts.forEach(p=>{
+              let dist=hypot(p.x-x,p.y-y);
+              let grow=dist<0.1;
+              let dt=grow?0.05:-0.1;
+              p.t=max(min(3,p.t+dt),0);
+              p.t && tentacle(c,p,min(1,p.t));
+            });
+          }
+        };
+      }
+
+      // 🎨 5 ta “slime” yaratamiz
+      const things = many(5, thing);
+
+      // har biriga random yo‘nalish beramiz
+      things.forEach(t => {
+        t.follow(rnds(1), rnds(1));
+      });
+
+      // pointer harakati
+      addEventListener("pointermove", e => {
+        const cssW = window.innerWidth;
+        const cssH = window.innerHeight;
+        const x = (e.clientX - cssW/2)/cssW;
+        const y = (e.clientY - cssH/2)/cssW;
+        // pointer harakati – barcha “slime”lar unga qarab yo‘naladi
+        things.forEach(thing => thing.follow(x,y));
+      });
+
+      // har bir “slime”ga o‘ziga xos rang beramiz
+      const colors = ['#00fff0', '#ff006e', '#ffe600', '#00ff75', '#ff7b00'];
+
+      // animatsiya
+      requestAnimationFrame(function frame(t){
+        t/=1000;
+        ctx.fillStyle="#00000040"; // fon iz qoldiradi
+        ctx.fillRect(-1,-1,2,2);
+
+        things.forEach((thing, i)=>{
+          ctx.fillStyle = colors[i % colors.length];
+          thing.tick(t + i * 0.3);
+        });
+
+        requestAnimationFrame(frame);
+      });
+    })();
+  </script>
+</body>
+</html>
